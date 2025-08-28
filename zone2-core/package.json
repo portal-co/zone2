@@ -1,0 +1,18 @@
+{
+  "name": "@portal-solutions/zone2-core",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "types": "index.d.ts",
+  "source": "index.ts",
+  "dependencies": {
+    "@portal-solutions/hooker-core": "^1.0.4"
+  }
+}

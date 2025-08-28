@@ -1,0 +1,9 @@
+{
+    "name": "@portal-solutions/zone2",
+    "workspaces": [
+        "zone2-core"
+    ],
+    "devDependencies": {
+        "parcel": "^2.15.4"
+    }
+}
