@@ -1,0 +1,116 @@
+import {_Proxy as $lM0mf$_Proxy, _WeakMap_prototype as $lM0mf$_WeakMap_prototype, _WeakMap as $lM0mf$_WeakMap, _Reflect as $lM0mf$_Reflect, snapshot as $lM0mf$snapshot} from "@portal-solutions/hooker-core";
+
+
+const { isFrozen: $797764687fadb970$var$isFrozen } = Object;
+function $797764687fadb970$var$trySet(obj, key, val) {
+    if (!$797764687fadb970$var$isFrozen(obj)) obj[key] = val;
+    return val;
+}
+const $797764687fadb970$var$globalThis_ = globalThis;
+function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf$_Proxy), globalThis: globalThis1 = $797764687fadb970$var$globalThis_ }) {
+    return class Zone {
+        static #current = undefined;
+        static get current() {
+            return this.#current;
+        }
+        static #setCurrent(a) {
+            this.#current = a;
+            while(a && (0, $lM0mf$_WeakMap_prototype).has(this.#conflictResolver, a)){
+                (0, $lM0mf$_WeakMap_prototype).get(this.#conflictResolver, a)();
+                (0, $lM0mf$_WeakMap_prototype).remove(this.#conflictResolver, a);
+            }
+            while(a === undefined && this.#undefinedConflictResolver){
+                const old = this.#undefinedConflictResolver;
+                this.#undefinedConflictResolver = undefined;
+                old();
+            }
+        }
+        static #savedPromise = globalThis1.Promise;
+        static #conflictResolver = new (0, $lM0mf$_WeakMap)();
+        static #undefinedConflictResolver = undefined;
+        static #hookedPromise = $797764687fadb970$var$trySet(globalThis1, "Promise", new _Proxy(this.#savedPromise, {
+            apply (target, thisArg, argArray) {
+                if (argArray.length) argArray[0] = Zone.#hook(argArray[0]);
+                return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+            },
+            construct (target, argArray, thisArg) {
+                if (argArray.length) argArray[0] = Zone.#hook(argArray[0]);
+                return (0, $lM0mf$_Reflect).construct(target, argArray, thisArg);
+            }
+        }));
+        // static #hookedProxy: typeof Proxy = trySet(globalThis, 'Proxy', new _Proxy(globalThis.Proxy, {
+        //     construct(target, argArray, thisArg) {
+        //         if (argArray.length >= 2) argArray[1] = {
+        //             ...new _Proxy(argArray[1], {
+        //                 get(object, key) {
+        //                     return Zone.#hook(_Reflect.get(object, key));
+        //                 }
+        //             })
+        //         };
+        //         return _Reflect.construct(target, argArray, thisArg);
+        //     }
+        // }));
+        // static get awareProxy() {
+        //     return this.#hookedProxy;
+        // }
+        static get unawareProxy() {
+            return _Proxy;
+        }
+        static #savedPromiseFinally = (0, $lM0mf$snapshot)(this.#hookedPromise.prototype.finally);
+        static #hook(object) {
+            const snap = this.#current;
+            if (typeof object === "function") object = new _Proxy(object, {
+                apply (target, thisArg, argArray) {
+                    const old = Zone.#current;
+                    Zone.#setCurrent(snap);
+                    let disable = false;
+                    try {
+                        let value = (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                        if (value instanceof Zone.#hookedPromise) {
+                            disable = true;
+                            value = Zone.#savedPromiseFinally(value, ((async_impl)=>()=>{
+                                    if (Zone.#current === snap) {
+                                        Zone.#setCurrent(old);
+                                        return;
+                                    }
+                                    async_impl();
+                                })(async ()=>{
+                                for(;;)if (Zone.#current === snap) {
+                                    Zone.#setCurrent(old);
+                                    return;
+                                } else await new Zone.#savedPromise((resolve)=>{
+                                    if (snap === undefined) Zone.#undefinedConflictResolver = ()=>resolve(undefined);
+                                    else (0, $lM0mf$_WeakMap_prototype).set(Zone.#conflictResolver, snap, resolve);
+                                });
+                            }));
+                        }
+                        return value;
+                    } finally{
+                        if (!disable) Zone.#setCurrent(old);
+                    }
+                }
+            });
+            return object;
+        }
+        static hook(object) {
+            return this.#hook(object);
+        }
+        static{
+            for (const promiseKey of [
+                "then",
+                "catch",
+                "finally"
+            ])$797764687fadb970$var$trySet(this.#hookedPromise.prototype, promiseKey, new _Proxy(this.#hookedPromise.prototype[promiseKey], {
+                apply (target, thisArg, argArray) {
+                    for(let i = 0; i < argArray.length; i++)argArray[i] = Zone.#hook(argArray[i]);
+                    return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                }
+            }));
+        }
+        constructor(){}
+    };
+}
+
+
+export {$797764687fadb970$export$185802fd694ee1f5 as create};
+//# sourceMappingURL=index.js.map
