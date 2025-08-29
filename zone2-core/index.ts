@@ -49,6 +49,11 @@ export function create({
     }
     static #savedPromise: typeof Promise = globalThis.Promise;
     static #conflictResolver: WeakMap<Zone, () => void> = new _WeakMap();
+    static #proxyMap: WeakMap<any, any> = new _WeakMap();
+    #proxyMapInstance: WeakMap<any, any> = new _WeakMap();
+    static get #currentProxyMap() {
+      return Zone.#current ? Zone.#current.#proxyMapInstance : Zone.#proxyMap;
+    }
     static #undefinedConflictResolver: (() => void) | undefined = undefined;
     static #hookedPromise: typeof Promise = trySet(
       globalThis,
@@ -87,7 +92,8 @@ export function create({
     );
     static #hook<T>(object: T): T {
       const snap = this.#current;
-      if (typeof object === "function")
+      if (typeof object === "function") {
+        const old = object;
         object = new _Proxy(object, {
           apply(target, thisArg, argArray) {
             const old = Zone.#current;
@@ -136,6 +142,9 @@ export function create({
             }
           },
         });
+        // if (snap === undefined) {
+        _WeakMap_prototype.set(Zone.#currentProxyMap, old, object);
+      }
       return object;
     }
     static hook<T>(object: T): T {
@@ -150,6 +159,46 @@ export function create({
             apply(target, thisArg, argArray) {
               for (let i = 0; i < argArray.length; i++)
                 argArray[i] = Zone.#hook(argArray[i]);
+              return _Reflect.apply(target, thisArg, argArray);
+            },
+          })
+        );
+      }
+      if (
+        "EventTarget" in globalThis &&
+        typeof globalThis.EventTarget === "object" &&
+        "prototype" in globalThis.EventTarget &&
+        typeof globalThis.EventTarget.prototype === "object" &&
+        "addEventListener" in globalThis.EventTarget.prototype &&
+        "removeEventListener" in globalThis.EventTarget.prototype &&
+        typeof globalThis.EventTarget.prototype.addEventListener ===
+          "function" &&
+        typeof globalThis.EventTarget.prototype.removeEventListener ===
+          "function"
+      ) {
+        trySet(
+          globalThis.EventTarget.prototype,
+          "addEventListener",
+          new _Proxy(globalThis.EventTarget.prototype.addEventListener, {
+            apply(target, thisArg, argArray) {
+              for (let i = 0; i < argArray.length; i++)
+                argArray[i] = Zone.#hook(argArray[i]);
+              return _Reflect.apply(target, thisArg, argArray);
+            },
+          })
+        );
+        trySet(
+          globalThis.EventTarget.prototype,
+          "removeEventListener",
+          new _Proxy(globalThis.EventTarget.prototype.removeEventListener, {
+            apply(target, thisArg, argArray) {
+              for (let i = 0; i < argArray.length; i++)
+                if (typeof argArray[i] === "function")
+                  argArray[i] =
+                    _WeakMap_prototype.get(
+                      Zone.#currentProxyMap,
+                      argArray[i]
+                    ) ?? argArray[i];
               return _Reflect.apply(target, thisArg, argArray);
             },
           })

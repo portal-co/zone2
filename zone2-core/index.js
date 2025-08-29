@@ -27,6 +27,11 @@ function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf
         }
         static #savedPromise = globalThis1.Promise;
         static #conflictResolver = new (0, $lM0mf$_WeakMap)();
+        static #proxyMap = new (0, $lM0mf$_WeakMap)();
+        #proxyMapInstance = new (0, $lM0mf$_WeakMap)();
+        static get #currentProxyMap() {
+            return Zone.#current ? Zone.#current.#proxyMapInstance : Zone.#proxyMap;
+        }
         static #undefinedConflictResolver = undefined;
         static #hookedPromise = $797764687fadb970$var$trySet(globalThis1, "Promise", new _Proxy(this.#savedPromise, {
             apply (target, thisArg, argArray) {
@@ -59,37 +64,42 @@ function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf
         static #savedPromiseFinally = (0, $lM0mf$snapshot)(this.#hookedPromise.prototype.finally);
         static #hook(object) {
             const snap = this.#current;
-            if (typeof object === "function") object = new _Proxy(object, {
-                apply (target, thisArg, argArray) {
-                    const old = Zone.#current;
-                    Zone.#setCurrent(snap);
-                    let disable = false;
-                    try {
-                        let value = (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
-                        if (value instanceof Zone.#hookedPromise) {
-                            disable = true;
-                            value = Zone.#savedPromiseFinally(value, ((async_impl)=>()=>{
-                                    if (Zone.#current === snap) {
+            if (typeof object === "function") {
+                const old = object;
+                object = new _Proxy(object, {
+                    apply (target, thisArg, argArray) {
+                        const old = Zone.#current;
+                        Zone.#setCurrent(snap);
+                        let disable = false;
+                        try {
+                            let value = (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                            if (value instanceof Zone.#hookedPromise) {
+                                disable = true;
+                                value = Zone.#savedPromiseFinally(value, ((async_impl)=>()=>{
+                                        if (Zone.#current === snap) {
+                                            Zone.#setCurrent(old);
+                                            return;
+                                        }
+                                        async_impl();
+                                    })(async ()=>{
+                                    for(;;)if (Zone.#current === snap) {
                                         Zone.#setCurrent(old);
                                         return;
-                                    }
-                                    async_impl();
-                                })(async ()=>{
-                                for(;;)if (Zone.#current === snap) {
-                                    Zone.#setCurrent(old);
-                                    return;
-                                } else await new Zone.#savedPromise((resolve)=>{
-                                    if (snap === undefined) Zone.#undefinedConflictResolver = ()=>resolve(undefined);
-                                    else (0, $lM0mf$_WeakMap_prototype).set(Zone.#conflictResolver, snap, resolve);
-                                });
-                            }));
+                                    } else await new Zone.#savedPromise((resolve)=>{
+                                        if (snap === undefined) Zone.#undefinedConflictResolver = ()=>resolve(undefined);
+                                        else (0, $lM0mf$_WeakMap_prototype).set(Zone.#conflictResolver, snap, resolve);
+                                    });
+                                }));
+                            }
+                            return value;
+                        } finally{
+                            if (!disable) Zone.#setCurrent(old);
                         }
-                        return value;
-                    } finally{
-                        if (!disable) Zone.#setCurrent(old);
                     }
-                }
-            });
+                });
+                // if (snap === undefined) {
+                (0, $lM0mf$_WeakMap_prototype).set(Zone.#currentProxyMap, old, object);
+            }
             return object;
         }
         static hook(object) {
@@ -106,6 +116,20 @@ function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf
                     return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
                 }
             }));
+            if ("EventTarget" in globalThis1 && typeof globalThis1.EventTarget === "object" && "prototype" in globalThis1.EventTarget && typeof globalThis1.EventTarget.prototype === "object" && "addEventListener" in globalThis1.EventTarget.prototype && "removeEventListener" in globalThis1.EventTarget.prototype && typeof globalThis1.EventTarget.prototype.addEventListener === "function" && typeof globalThis1.EventTarget.prototype.removeEventListener === "function") {
+                $797764687fadb970$var$trySet(globalThis1.EventTarget.prototype, "addEventListener", new _Proxy(globalThis1.EventTarget.prototype.addEventListener, {
+                    apply (target, thisArg, argArray) {
+                        for(let i = 0; i < argArray.length; i++)argArray[i] = Zone.#hook(argArray[i]);
+                        return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                    }
+                }));
+                $797764687fadb970$var$trySet(globalThis1.EventTarget.prototype, "removeEventListener", new _Proxy(globalThis1.EventTarget.prototype.removeEventListener, {
+                    apply (target, thisArg, argArray) {
+                        for(let i = 0; i < argArray.length; i++)if (typeof argArray[i] === "function") argArray[i] = (0, $lM0mf$_WeakMap_prototype).get(Zone.#currentProxyMap, argArray[i]) ?? argArray[i];
+                        return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                    }
+                }));
+            }
         }
         constructor(){}
     };
