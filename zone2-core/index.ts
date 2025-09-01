@@ -1,9 +1,9 @@
 import {
   _Proxy as _Proxy_,
-  _Reflect,
+  _Reflect as _Reflect_,
   snapshot,
-  _WeakMap,
-  _WeakMap_prototype,
+  _WeakMap as _WeakMap_,
+  _WeakMap_prototype as _WeakMap_prototype_,
 } from "@portal-solutions/hooker-core";
 const { isFrozen } = Object;
 function trySet<T, K extends keyof T>(obj: T, key: K, val: T[K]): T[K] {
@@ -17,31 +17,45 @@ export interface ZoneProvider {
   unawareProxy: typeof Proxy;
   current: IZone | undefined;
   hook<T>(a: T): T;
+  enter<T>(zone: IZone | undefined, func: () => T): T;
 }
-export interface IZone {}
+export interface IZone {
+  enter<T>(fn: () => T): T;
+}
 export interface Global {
   Promise: typeof Promise;
   // Proxy: typeof Proxy;
 }
+export type CreateOpts = {
+  _Proxy?: typeof Proxy;
+  globalThis?: Global;
+  _WeakMap?: typeof _WeakMap_;
+  _WeakMap_prototype?: typeof _WeakMap_prototype_;
+  _Reflect?: typeof Reflect;
+};
 export function create({
   _Proxy = _Proxy_,
   globalThis = globalThis_,
-}: {
-  _Proxy?: typeof Proxy;
-  globalThis: Global;
-}): ZoneProvider {
+  _WeakMap = _WeakMap_,
+  _WeakMap_prototype = _WeakMap_prototype_,
+  _Reflect = _Reflect_,
+}: CreateOpts = {}): ZoneProvider {
   return class Zone implements IZone {
     static #current: Zone | undefined = undefined;
     static get current() {
       return this.#current;
     }
-    static #setCurrent(a: Zone | undefined) {
-      this.#current = a;
-      while (a && _WeakMap_prototype.has(this.#conflictResolver, a)) {
-        _WeakMap_prototype.get(this.#conflictResolver, a)();
-        _WeakMap_prototype.remove(this.#conflictResolver, a);
+    static #setCurrent(targetZone: Zone | undefined) {
+      this.#current = targetZone;
+      while (
+        targetZone &&
+        _WeakMap_prototype.has(this.#conflictResolver, targetZone)
+      ) {
+        const x = _WeakMap_prototype.get(this.#conflictResolver, targetZone);
+        _WeakMap_prototype.remove(this.#conflictResolver, targetZone);
+        x();
       }
-      while (a === undefined && this.#undefinedConflictResolver) {
+      while (targetZone === undefined && this.#undefinedConflictResolver) {
         const old = this.#undefinedConflictResolver;
         this.#undefinedConflictResolver = undefined;
         old();
@@ -51,8 +65,14 @@ export function create({
     static #conflictResolver: WeakMap<Zone, () => void> = new _WeakMap();
     static #proxyMap: WeakMap<any, any> = new _WeakMap();
     #proxyMapInstance: WeakMap<any, any> = new _WeakMap();
+    static #proxyMapFor(zone: Zone | undefined): WeakMap<any, any> {
+      if (zone === undefined) {
+        return Zone.#proxyMap;
+      }
+      return zone.#proxyMapInstance;
+    }
     static get #currentProxyMap() {
-      return Zone.#current ? Zone.#current.#proxyMapInstance : Zone.#proxyMap;
+      return Zone.#proxyMapFor(Zone.#current);
     }
     static #undefinedConflictResolver: (() => void) | undefined = undefined;
     static #hookedPromise: typeof Promise = trySet(
@@ -90,56 +110,57 @@ export function create({
     static #savedPromiseFinally = snapshot(
       this.#hookedPromise.prototype.finally
     );
-    static #hook<T>(object: T): T {
+    static #enter<T>(
+      zone: Zone | undefined,
+      func: () => T,
+      type: "generic" = "generic"
+    ): T {
+      const old = Zone.#current;
+      Zone.#setCurrent(zone);
+      let disable = false;
+      try {
+        let value = func();
+        if (value instanceof Zone.#hookedPromise) {
+          disable = true;
+          const resolve = () => {
+            if (Zone.#current === zone) {
+              Zone.#setCurrent(old);
+              return;
+            }
+            if (zone === undefined) {
+              Zone.#undefinedConflictResolver = () => resolve();
+            } else {
+              _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
+            }
+          };
+          value = Zone.#savedPromiseFinally(value, resolve);
+        }
+        return value;
+      } finally {
+        if (!disable) {
+          Zone.#setCurrent(old);
+        }
+      }
+    }
+    static enter<T>(zone: IZone | undefined, func: () => T): T {
+      if (zone !== undefined && !(zone instanceof Zone))
+        return zone.enter(func);
+      return Zone.#enter(zone as Zone | undefined, func);
+    }
+    enter<T>(func: () => T): T {
+      return Zone.#enter(this, func);
+    }
+    static #hook<T>(object: T, type: "generic" = "generic"): T {
       const snap = this.#current;
       if (typeof object === "function") {
         const old = object;
         object = new _Proxy(object, {
           apply(target, thisArg, argArray) {
-            const old = Zone.#current;
-            Zone.#setCurrent(snap);
-            let disable = false;
-            try {
-              let value = _Reflect.apply(target, thisArg, argArray);
-              if (value instanceof Zone.#hookedPromise) {
-                disable = true;
-                value = Zone.#savedPromiseFinally(
-                  value,
-                  ((async_impl) => () => {
-                    if (Zone.#current === snap) {
-                      Zone.#setCurrent(old);
-                      return;
-                    }
-                    async_impl();
-                  })(async () => {
-                    for (;;) {
-                      if (Zone.#current === snap) {
-                        Zone.#setCurrent(old);
-                        return;
-                      } else {
-                        await new Zone.#savedPromise((resolve) => {
-                          if (snap === undefined) {
-                            Zone.#undefinedConflictResolver = () =>
-                              resolve(undefined);
-                          } else {
-                            _WeakMap_prototype.set(
-                              Zone.#conflictResolver,
-                              snap,
-                              resolve
-                            );
-                          }
-                        });
-                      }
-                    }
-                  })
-                );
-              }
-              return value;
-            } finally {
-              if (!disable) {
-                Zone.#setCurrent(old);
-              }
-            }
+            return Zone.#enter(
+              snap,
+              () => _Reflect.apply(target, thisArg, argArray),
+              type
+            );
           },
         });
         // if (snap === undefined) {

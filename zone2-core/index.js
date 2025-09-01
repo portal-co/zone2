@@ -1,4 +1,4 @@
-import {_Proxy as $lM0mf$_Proxy, _WeakMap_prototype as $lM0mf$_WeakMap_prototype, _WeakMap as $lM0mf$_WeakMap, _Reflect as $lM0mf$_Reflect, snapshot as $lM0mf$snapshot} from "@portal-solutions/hooker-core";
+import {_Proxy as $lM0mf$_Proxy, _WeakMap as $lM0mf$_WeakMap, _WeakMap_prototype as $lM0mf$_WeakMap_prototype, _Reflect as $lM0mf$_Reflect, snapshot as $lM0mf$snapshot} from "@portal-solutions/hooker-core";
 
 
 const { isFrozen: $797764687fadb970$var$isFrozen } = Object;
@@ -7,40 +7,45 @@ function $797764687fadb970$var$trySet(obj, key, val) {
     return val;
 }
 const $797764687fadb970$var$globalThis_ = globalThis;
-function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf$_Proxy), globalThis: globalThis1 = $797764687fadb970$var$globalThis_ }) {
+function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf$_Proxy), globalThis: globalThis1 = $797764687fadb970$var$globalThis_, _WeakMap: _WeakMap = (0, $lM0mf$_WeakMap), _WeakMap_prototype: _WeakMap_prototype = (0, $lM0mf$_WeakMap_prototype), _Reflect: _Reflect = (0, $lM0mf$_Reflect) } = {}) {
     return class Zone {
         static #current = undefined;
         static get current() {
             return this.#current;
         }
-        static #setCurrent(a) {
-            this.#current = a;
-            while(a && (0, $lM0mf$_WeakMap_prototype).has(this.#conflictResolver, a)){
-                (0, $lM0mf$_WeakMap_prototype).get(this.#conflictResolver, a)();
-                (0, $lM0mf$_WeakMap_prototype).remove(this.#conflictResolver, a);
+        static #setCurrent(targetZone) {
+            this.#current = targetZone;
+            while(targetZone && _WeakMap_prototype.has(this.#conflictResolver, targetZone)){
+                const x = _WeakMap_prototype.get(this.#conflictResolver, targetZone);
+                _WeakMap_prototype.remove(this.#conflictResolver, targetZone);
+                x();
             }
-            while(a === undefined && this.#undefinedConflictResolver){
+            while(targetZone === undefined && this.#undefinedConflictResolver){
                 const old = this.#undefinedConflictResolver;
                 this.#undefinedConflictResolver = undefined;
                 old();
             }
         }
         static #savedPromise = globalThis1.Promise;
-        static #conflictResolver = new (0, $lM0mf$_WeakMap)();
-        static #proxyMap = new (0, $lM0mf$_WeakMap)();
-        #proxyMapInstance = new (0, $lM0mf$_WeakMap)();
+        static #conflictResolver = new _WeakMap();
+        static #proxyMap = new _WeakMap();
+        #proxyMapInstance = new _WeakMap();
+        static #proxyMapFor(zone) {
+            if (zone === undefined) return Zone.#proxyMap;
+            return zone.#proxyMapInstance;
+        }
         static get #currentProxyMap() {
-            return Zone.#current ? Zone.#current.#proxyMapInstance : Zone.#proxyMap;
+            return Zone.#proxyMapFor(Zone.#current);
         }
         static #undefinedConflictResolver = undefined;
         static #hookedPromise = $797764687fadb970$var$trySet(globalThis1, "Promise", new _Proxy(this.#savedPromise, {
             apply (target, thisArg, argArray) {
                 if (argArray.length) argArray[0] = Zone.#hook(argArray[0]);
-                return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                return _Reflect.apply(target, thisArg, argArray);
             },
             construct (target, argArray, thisArg) {
                 if (argArray.length) argArray[0] = Zone.#hook(argArray[0]);
-                return (0, $lM0mf$_Reflect).construct(target, argArray, thisArg);
+                return _Reflect.construct(target, argArray, thisArg);
             }
         }));
         // static #hookedProxy: typeof Proxy = trySet(globalThis, 'Proxy', new _Proxy(globalThis.Proxy, {
@@ -62,43 +67,47 @@ function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf
             return _Proxy;
         }
         static #savedPromiseFinally = (0, $lM0mf$snapshot)(this.#hookedPromise.prototype.finally);
-        static #hook(object) {
+        static #enter(zone, func, type = "generic") {
+            const old = Zone.#current;
+            Zone.#setCurrent(zone);
+            let disable = false;
+            try {
+                let value = func();
+                if (value instanceof Zone.#hookedPromise) {
+                    disable = true;
+                    const resolve = ()=>{
+                        if (Zone.#current === zone) {
+                            Zone.#setCurrent(old);
+                            return;
+                        }
+                        if (zone === undefined) Zone.#undefinedConflictResolver = ()=>resolve();
+                        else _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
+                    };
+                    value = Zone.#savedPromiseFinally(value, resolve);
+                }
+                return value;
+            } finally{
+                if (!disable) Zone.#setCurrent(old);
+            }
+        }
+        static enter(zone, func) {
+            if (zone !== undefined && !(zone instanceof Zone)) return zone.enter(func);
+            return Zone.#enter(zone, func);
+        }
+        enter(func) {
+            return Zone.#enter(this, func);
+        }
+        static #hook(object, type = "generic") {
             const snap = this.#current;
             if (typeof object === "function") {
                 const old = object;
                 object = new _Proxy(object, {
                     apply (target, thisArg, argArray) {
-                        const old = Zone.#current;
-                        Zone.#setCurrent(snap);
-                        let disable = false;
-                        try {
-                            let value = (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
-                            if (value instanceof Zone.#hookedPromise) {
-                                disable = true;
-                                value = Zone.#savedPromiseFinally(value, ((async_impl)=>()=>{
-                                        if (Zone.#current === snap) {
-                                            Zone.#setCurrent(old);
-                                            return;
-                                        }
-                                        async_impl();
-                                    })(async ()=>{
-                                    for(;;)if (Zone.#current === snap) {
-                                        Zone.#setCurrent(old);
-                                        return;
-                                    } else await new Zone.#savedPromise((resolve)=>{
-                                        if (snap === undefined) Zone.#undefinedConflictResolver = ()=>resolve(undefined);
-                                        else (0, $lM0mf$_WeakMap_prototype).set(Zone.#conflictResolver, snap, resolve);
-                                    });
-                                }));
-                            }
-                            return value;
-                        } finally{
-                            if (!disable) Zone.#setCurrent(old);
-                        }
+                        return Zone.#enter(snap, ()=>_Reflect.apply(target, thisArg, argArray), type);
                     }
                 });
                 // if (snap === undefined) {
-                (0, $lM0mf$_WeakMap_prototype).set(Zone.#currentProxyMap, old, object);
+                _WeakMap_prototype.set(Zone.#currentProxyMap, old, object);
             }
             return object;
         }
@@ -113,20 +122,20 @@ function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf
             ])$797764687fadb970$var$trySet(this.#hookedPromise.prototype, promiseKey, new _Proxy(this.#hookedPromise.prototype[promiseKey], {
                 apply (target, thisArg, argArray) {
                     for(let i = 0; i < argArray.length; i++)argArray[i] = Zone.#hook(argArray[i]);
-                    return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                    return _Reflect.apply(target, thisArg, argArray);
                 }
             }));
             if ("EventTarget" in globalThis1 && typeof globalThis1.EventTarget === "object" && "prototype" in globalThis1.EventTarget && typeof globalThis1.EventTarget.prototype === "object" && "addEventListener" in globalThis1.EventTarget.prototype && "removeEventListener" in globalThis1.EventTarget.prototype && typeof globalThis1.EventTarget.prototype.addEventListener === "function" && typeof globalThis1.EventTarget.prototype.removeEventListener === "function") {
                 $797764687fadb970$var$trySet(globalThis1.EventTarget.prototype, "addEventListener", new _Proxy(globalThis1.EventTarget.prototype.addEventListener, {
                     apply (target, thisArg, argArray) {
                         for(let i = 0; i < argArray.length; i++)argArray[i] = Zone.#hook(argArray[i]);
-                        return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                        return _Reflect.apply(target, thisArg, argArray);
                     }
                 }));
                 $797764687fadb970$var$trySet(globalThis1.EventTarget.prototype, "removeEventListener", new _Proxy(globalThis1.EventTarget.prototype.removeEventListener, {
                     apply (target, thisArg, argArray) {
-                        for(let i = 0; i < argArray.length; i++)if (typeof argArray[i] === "function") argArray[i] = (0, $lM0mf$_WeakMap_prototype).get(Zone.#currentProxyMap, argArray[i]) ?? argArray[i];
-                        return (0, $lM0mf$_Reflect).apply(target, thisArg, argArray);
+                        for(let i = 0; i < argArray.length; i++)if (typeof argArray[i] === "function") argArray[i] = _WeakMap_prototype.get(Zone.#currentProxyMap, argArray[i]) ?? argArray[i];
+                        return _Reflect.apply(target, thisArg, argArray);
                     }
                 }));
             }
