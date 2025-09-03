@@ -118,27 +118,28 @@ export function create({
       const old = Zone.#current;
       Zone.#setCurrent(zone);
       let disable = false;
+      const resolve = () => {
+        if (Zone.#current === zone) {
+          Zone.#setCurrent(old);
+          return;
+        }
+        if (zone === undefined) {
+          Zone.#undefinedConflictResolver = () => resolve();
+        } else {
+          _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
+        }
+      };
       try {
         let value = func();
         if (value instanceof Zone.#hookedPromise) {
           disable = true;
-          const resolve = () => {
-            if (Zone.#current === zone) {
-              Zone.#setCurrent(old);
-              return;
-            }
-            if (zone === undefined) {
-              Zone.#undefinedConflictResolver = () => resolve();
-            } else {
-              _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
-            }
-          };
-          value = Zone.#savedPromiseFinally(value, resolve);
+
+          value = Zone.#savedPromiseFinally(value, resolve) as T;
         }
         return value;
       } finally {
         if (!disable) {
-          Zone.#setCurrent(old);
+          resolve();
         }
       }
     }

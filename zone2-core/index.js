@@ -71,23 +71,23 @@ function $797764687fadb970$export$185802fd694ee1f5({ _Proxy: _Proxy = (0, $lM0mf
             const old = Zone.#current;
             Zone.#setCurrent(zone);
             let disable = false;
+            const resolve = ()=>{
+                if (Zone.#current === zone) {
+                    Zone.#setCurrent(old);
+                    return;
+                }
+                if (zone === undefined) Zone.#undefinedConflictResolver = ()=>resolve();
+                else _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
+            };
             try {
                 let value = func();
                 if (value instanceof Zone.#hookedPromise) {
                     disable = true;
-                    const resolve = ()=>{
-                        if (Zone.#current === zone) {
-                            Zone.#setCurrent(old);
-                            return;
-                        }
-                        if (zone === undefined) Zone.#undefinedConflictResolver = ()=>resolve();
-                        else _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
-                    };
                     value = Zone.#savedPromiseFinally(value, resolve);
                 }
                 return value;
             } finally{
-                if (!disable) Zone.#setCurrent(old);
+                if (!disable) resolve();
             }
         }
         static enter(zone, func) {
