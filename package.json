@@ -1,12 +1,13 @@
 {
-    "name": "@portal-solutions/zone2",
-    "workspaces": [
-        "zone2-core"
-    ],
-    "devDependencies": {
-        "@parcel/packager-ts": "^2.15.4",
-        "@parcel/transformer-typescript-types": "^2.15.4",
-        "parcel": "^2.15.4",
-        "typescript": "^5.9.2"
-    }
+  "name": "@portal-solutions/zone2",
+  "workspaces": [
+    "zone2-core"
+  ],
+  "devDependencies": {
+    "@parcel/packager-ts": "^2.15.4",
+    "@parcel/transformer-typescript-types": "^2.15.4",
+    "parcel": "^2.15.4",
+    "typescript": "^5.9.2"
+  },
+  "zshy": "./zone2-core/index.ts"
 }
