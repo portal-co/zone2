@@ -1,2 +1,2 @@
 cd $(dirname $0)
-npx zshyne2-core
+npx zshy -p tsconfig.json
