@@ -1,0 +1,172 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.create = create;
+const hooker_core_1 = require("@portal-solutions/hooker-core");
+const { isFrozen } = Object;
+function trySet(obj, key, val) {
+    if (!isFrozen(obj))
+        obj[key] = val;
+    return val;
+}
+const globalThis_ = globalThis;
+function create({ _Proxy = hooker_core_1._Proxy, globalThis = globalThis_, _WeakMap = hooker_core_1._WeakMap, _WeakMap_prototype = hooker_core_1._WeakMap_prototype, _Reflect = hooker_core_1._Reflect, } = {}) {
+    return class Zone {
+        static #current = undefined;
+        static get current() {
+            return this.#current;
+        }
+        static #setCurrent(targetZone) {
+            this.#current = targetZone;
+            while (targetZone &&
+                _WeakMap_prototype.has(this.#conflictResolver, targetZone)) {
+                const x = _WeakMap_prototype.get(this.#conflictResolver, targetZone);
+                _WeakMap_prototype.remove(this.#conflictResolver, targetZone);
+                x();
+            }
+            while (targetZone === undefined && this.#undefinedConflictResolver) {
+                const old = this.#undefinedConflictResolver;
+                this.#undefinedConflictResolver = undefined;
+                old();
+            }
+        }
+        static #savedPromise = globalThis.Promise;
+        static #conflictResolver = new _WeakMap();
+        static #proxyMap = new _WeakMap();
+        #proxyMapInstance = new _WeakMap();
+        static #proxyMapFor(zone) {
+            if (zone === undefined) {
+                return Zone.#proxyMap;
+            }
+            return zone.#proxyMapInstance;
+        }
+        static get #currentProxyMap() {
+            return Zone.#proxyMapFor(Zone.#current);
+        }
+        static #undefinedConflictResolver = undefined;
+        static #hookedPromise = trySet(globalThis, "Promise", new _Proxy(this.#savedPromise, {
+            apply(target, thisArg, argArray) {
+                if (argArray.length)
+                    argArray[0] = Zone.#hook(argArray[0]);
+                return _Reflect.apply(target, thisArg, argArray);
+            },
+            construct(target, argArray, thisArg) {
+                if (argArray.length)
+                    argArray[0] = Zone.#hook(argArray[0]);
+                return _Reflect.construct(target, argArray, thisArg);
+            },
+        }));
+        // static #hookedProxy: typeof Proxy = trySet(globalThis, 'Proxy', new _Proxy(globalThis.Proxy, {
+        //     construct(target, argArray, thisArg) {
+        //         if (argArray.length >= 2) argArray[1] = {
+        //             ...new _Proxy(argArray[1], {
+        //                 get(object, key) {
+        //                     return Zone.#hook(_Reflect.get(object, key));
+        //                 }
+        //             })
+        //         };
+        //         return _Reflect.construct(target, argArray, thisArg);
+        //     }
+        // }));
+        // static get awareProxy() {
+        //     return this.#hookedProxy;
+        // }
+        static get unawareProxy() {
+            return _Proxy;
+        }
+        static #savedPromiseFinally = (0, hooker_core_1.snapshot)(this.#hookedPromise.prototype.finally);
+        static #enter(zone, func, type = "generic") {
+            const old = Zone.#current;
+            Zone.#setCurrent(zone);
+            let disable = false;
+            const resolve = () => {
+                if (Zone.#current === zone) {
+                    Zone.#setCurrent(old);
+                    return;
+                }
+                if (zone === undefined) {
+                    Zone.#undefinedConflictResolver = () => resolve();
+                }
+                else {
+                    _WeakMap_prototype.set(Zone.#conflictResolver, zone, resolve);
+                }
+            };
+            try {
+                let value = func();
+                if (value instanceof Zone.#hookedPromise) {
+                    disable = true;
+                    value = Zone.#savedPromiseFinally(value, resolve);
+                }
+                return value;
+            }
+            finally {
+                if (!disable) {
+                    resolve();
+                }
+            }
+        }
+        static enter(zone, func) {
+            if (zone !== undefined && !(zone instanceof Zone))
+                return zone.enter(func);
+            return Zone.#enter(zone, func);
+        }
+        enter(func) {
+            return Zone.#enter(this, func);
+        }
+        static #hook(object, type = "generic") {
+            const snap = this.#current;
+            if (typeof object === "function") {
+                const old = object;
+                object = new _Proxy(object, {
+                    apply(target, thisArg, argArray) {
+                        return Zone.#enter(snap, () => _Reflect.apply(target, thisArg, argArray), type);
+                    },
+                });
+                // if (snap === undefined) {
+                _WeakMap_prototype.set(Zone.#currentProxyMap, old, object);
+            }
+            return object;
+        }
+        static hook(object) {
+            return this.#hook(object);
+        }
+        static {
+            for (const promiseKey of ["then", "catch", "finally"]) {
+                trySet(this.#hookedPromise.prototype, promiseKey, new _Proxy(this.#hookedPromise.prototype[promiseKey], {
+                    apply(target, thisArg, argArray) {
+                        for (let i = 0; i < argArray.length; i++)
+                            argArray[i] = Zone.#hook(argArray[i]);
+                        return _Reflect.apply(target, thisArg, argArray);
+                    },
+                }));
+            }
+            if ("EventTarget" in globalThis &&
+                typeof globalThis.EventTarget === "object" &&
+                "prototype" in globalThis.EventTarget &&
+                typeof globalThis.EventTarget.prototype === "object" &&
+                "addEventListener" in globalThis.EventTarget.prototype &&
+                "removeEventListener" in globalThis.EventTarget.prototype &&
+                typeof globalThis.EventTarget.prototype.addEventListener ===
+                    "function" &&
+                typeof globalThis.EventTarget.prototype.removeEventListener ===
+                    "function") {
+                trySet(globalThis.EventTarget.prototype, "addEventListener", new _Proxy(globalThis.EventTarget.prototype.addEventListener, {
+                    apply(target, thisArg, argArray) {
+                        for (let i = 0; i < argArray.length; i++)
+                            argArray[i] = Zone.#hook(argArray[i]);
+                        return _Reflect.apply(target, thisArg, argArray);
+                    },
+                }));
+                trySet(globalThis.EventTarget.prototype, "removeEventListener", new _Proxy(globalThis.EventTarget.prototype.removeEventListener, {
+                    apply(target, thisArg, argArray) {
+                        for (let i = 0; i < argArray.length; i++)
+                            if (typeof argArray[i] === "function")
+                                argArray[i] =
+                                    _WeakMap_prototype.get(Zone.#currentProxyMap, argArray[i]) ?? argArray[i];
+                        return _Reflect.apply(target, thisArg, argArray);
+                    },
+                }));
+            }
+        }
+        constructor() { }
+    };
+}

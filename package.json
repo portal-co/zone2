@@ -9,5 +9,18 @@
     "parcel": "^2.15.4",
     "typescript": "^5.9.2"
   },
-  "zshy": "./zone2-core/index.ts"
+  "zshy": "./zone2-core/index.ts",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  }
 }
