@@ -1,13 +1,14 @@
 # @portal-solutions/zone2
 
 ## Description
-Project zone2
+A TypeScript workspace (`zone2`) containing `zone2-core`. Likely related to "Zone.js" or execution contexts.
 
 ## Goals
-- [ ] Add project goals
+- [ ] Manage execution zones
+- [ ] Provide context propagation
 
 ## Progress
-- [ ] Initial setup
+- [ ] Workspace setup
 
 ---
 *AI assisted*
